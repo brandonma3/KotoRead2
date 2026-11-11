@@ -1,4 +1,3 @@
-AML
 name: Build Android APK
 
 on:
@@ -11,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 檢出程式碼
+      - name: 檢出專案程式碼
         uses: actions/checkout@v4
 
       - name: 設定 JDK 17
@@ -20,19 +19,40 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 自動配置 Android SDK 與 Gradle 環境
+      - name: 檢查目錄並自動補齊 Gradle 骨架
         run: |
+          echo "=== 檢查當前根目錄檔案 ==="
+          ls -la
+          
+          # 若缺少 settings.gradle.kts 則自動生成
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
+            echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle.kts
+            echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
+            echo 'rootProject.name = "KotoRead"' >> settings.gradle.kts
+            echo 'include(":app")' >> settings.gradle.kts
+          fi
+
+          # 若缺少根目錄 build.gradle.kts 則自動生成
+          if [ ! -f "build.gradle.kts" ] && [ ! -f "build.gradle" ]; then
+            echo 'plugins {' > build.gradle.kts
+            echo '    id("com.android.application") version "8.4.1" apply false' >> build.gradle.kts
+            echo '    id("org.jetbrains.kotlin.android") version "1.9.24" apply false' >> build.gradle.kts
+            echo '    id("com.google.devtools.ksp") version "1.9.24-1.0.20" apply false' >> build.gradle.kts
+            echo '}' >> build.gradle.kts
+          fi
+
+          # 若缺少 gradlew 則自動由系統 gradle 生成官方 wrapper
           if [ ! -f "gradlew" ]; then
-            echo "Installing gradle CLI..."
+            echo "Installing gradle CLI to generate wrapper..."
             sudo apt-get update && sudo apt-get install -y gradle
-            gradle wrapper
+            gradle wrapper --gradle-version 8.7
           fi
           chmod +x gradlew
 
       - name: 一鍵編譯 Debug APK
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: 上傳 APK 安裝檔
+      - name: 上傳編譯完成的 APK 檔案供直接下載
         uses: actions/upload-artifact@v4
         with:
           name: KotoRead-NovelReader-APK
